@@ -40,3 +40,24 @@ deploying them locally.
 
 Finally, we'll turn the data processing and report into a multi stage workflow, and hook
 the dashboard up to the production model.
+
+## Adding tracking
+
+First thing we want to do is to start a tracking server:
+
+`mlflow ui`
+
+By default this will just use the file system. We'll switch to SQLite soon as there
+are some things you can't do on the file system.
+
+Then we want to go through our notebooks and convert things over to make use of mlflow.
+
+1. Starting with the linear regression, we see how simple it is to log metrics and the model.
+2. With the RFRegressor, see how we can also log model parameters. And then see that you have multiple runs in a single execution, if you really want!
+3. Then with Keras, we make use of autolog. And note that we could have done that with the other two as well!
+
+This tracking raises two questions:
+* How can someone reproduce the exact run?
+* How can we pick a model to serve?
+
+
