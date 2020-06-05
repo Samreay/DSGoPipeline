@@ -59,5 +59,5 @@ Then we want to go through our notebooks and convert things over to make use of 
 This tracking raises two questions:
 * How can someone reproduce the exact run?
 * How can we pick a model to serve?
-
+* How can we compare multiple models ourselves, outside of the UI interface? (Note that this will probably be built into mlflow at some point, and atm tools like Neptune can do it for you)
 
