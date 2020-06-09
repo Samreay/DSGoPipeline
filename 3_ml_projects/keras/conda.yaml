@@ -3,6 +3,9 @@ channels:
 dependencies:
 - python=3.7.7
 - pip
+- matplotlib
+- pandas
+- scikit-learn=0.22.1
 - pip:
   - mlflow
   - tensorflow==2.2.0

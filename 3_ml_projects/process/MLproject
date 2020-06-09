@@ -1,0 +1,5 @@
+name: processData
+conda_env: conda.yaml # Or a docker container
+entry_points:
+  main:
+    command: "python make_processed_data.py"

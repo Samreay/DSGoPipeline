@@ -5,15 +5,14 @@
 
 
 import pandas as pd
-import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
-import plotly.express as px
 import mlflow # New
 import mlflow.sklearn # New
 
 mlflow.set_experiment("predicting_wind_solar") # New, optional
+
 
 def eval_metrics(actual, pred):
     rmse = np.sqrt(mean_squared_error(actual, pred))
@@ -21,23 +20,12 @@ def eval_metrics(actual, pred):
     r2 = r2_score(actual, pred)
     return rmse, mae, r2
 
-
-# In[5]:
-
-
 df = pd.read_csv("germany.csv", parse_dates=[0], index_col=0)
 df.head()
-
-
-# In[6]:
-
 
 X = df[["windspeed", "temperature", "rad_horizontal", "rad_diffuse"]]
 y = df[["solar_GW", "wind_GW"]]
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-
-
-# In[15]:
 
 
 for n_estimators in [4, 9, 25, 64]:
@@ -57,34 +45,4 @@ for n_estimators in [4, 9, 25, 64]:
             mlflow.log_metric("mae", mae) # New
             mlflow.log_metric("r2", r2) # New
             mlflow.sklearn.log_model(model, "model") # New
-
-
-# In[12]:
-
-
-fig = px.scatter(x=y_test["solar_GW"], y=y_predict[:, 0], 
-             color=X_test["temperature"], range_color=[-5, 25],
-             color_continuous_scale="ice")
-fig.update_layout(xaxis_title="Actual Solar", 
-                  yaxis_title="Predicted Solar", 
-                  coloraxis_colorbar=dict(title="temperature"))
-fig.show()
-
-
-# In[13]:
-
-
-fig = px.scatter(x=y_test["wind_GW"], y=y_predict[:, 1], 
-                 color=X_test["windspeed"], range_color=[0, 8],
-                color_continuous_scale="ice")
-fig.update_layout(xaxis_title="Actual Wind", 
-                  yaxis_title="Predicted Wind",
-                  coloraxis_colorbar=dict(title="windspeed"))
-fig.show()
-
-
-# In[ ]:
-
-
-
 

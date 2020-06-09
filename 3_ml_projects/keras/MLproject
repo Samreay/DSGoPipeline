@@ -1,0 +1,5 @@
+name: kerasModel
+conda_env: conda.yaml # Or a docker container
+entry_points:
+  main:
+    command: "python model_keras.py"
