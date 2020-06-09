@@ -1,6 +1,7 @@
 # DSGoPipeline
 
-Alrighty, let's get into it.
+Alrighty, let's get into it. The goal in this project is to go from the chaotic assortment of scripts and independent work
+in the `1_starting_point` directory, into something that looks like a much nicer DS pipeline.
 
 ## Installation
 
@@ -43,13 +44,19 @@ the dashboard up to the production model.
 
 ## Adding tracking
 
-First thing we want to do is to start a tracking server. Now this isn't the easiest way of doing it, but it does emulate a remote tracking
-server better. So with the tracking, we need a place to put information, and a place to put artifacts. The latter is normally
-a google cloud, Azure blob storage, Amazong S3 bucket, etc. We'll emulate this with a super simple FTP server in the `server` folder. Let's start it with:
+First thing we want to do is to start a tracking server. Instead of just pointing this at the file system
+and hoping for the best, lets put in a tiny bit of effort now so that it better emulates a remote tracking
+server like you might actually end up using better. 
+
+So with the tracking, we need a place to put information, and a place to put artifacts. 
+
+The latter is normally a google cloud, Azure blob storage, Amazon S3 bucket, etc. 
+We'll emulate this with a super simple FTP server in the `server` folder. Let's start it with:
 
 `python ftpserver.py`
 
-Then, let us also utilise a small sqlite database to store all the information that isn't a collection of files. In the server folder, we also run
+which just launches a very small FTP server locally in the server folder, with a dummy user to make authentication
+easier. Let us also utilise a small sqlite database to store all the information that isn't a collection of files. In the server folder, we also run
 
 `mlflow server --backend-store-uri sqlite:///mlruns.db --default-artifact-root ftp://guest:12345@127.0.0.1::2121/artifacts`
 
@@ -57,9 +64,9 @@ Now one thing we want to do is make sure that this is the server we use for the 
 
 `MLFLOW_TRACKING_URI=http://127.0.0.1:5000`
 
-which is just the location of the server we launched.
+which is just the location of the server we launched. And that's it! Now we jump into the code!
 
-Then we want to go through our notebooks and convert things over to make use of mlflow.
+We want to go through our notebooks and convert things over to make use of mlflow.
 
 1. Starting with the linear regression, we see how simple it is to log metrics and the model.
 2. With the RFRegressor, see how we can also log model parameters. And then see that you have multiple runs in a single execution, if you really want!
