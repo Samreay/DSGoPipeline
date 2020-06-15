@@ -1,6 +1,5 @@
 from datetime import datetime
 import numpy as np
-from airflow import DAG
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
 from sklearn.ensemble import RandomForestRegressor
@@ -9,14 +8,15 @@ import pandas as pd
 import mlflow
 import mlflow.sklearn
 from mlflow.tracking.client import MlflowClient
-import logging
 import inspect
 import os
 
+from airflow import DAG
 from airflow.operators.python_operator import PythonOperator
 
 
 def eval_metrics(actual, pred):
+    """ Youve seen this before """
     rmse = np.sqrt(mean_squared_error(actual, pred))
     mae = mean_absolute_error(actual, pred)
     r2 = r2_score(actual, pred)
@@ -24,6 +24,7 @@ def eval_metrics(actual, pred):
 
 
 def process_data(**kwargs):
+    """ Task 1 - turn the raw data into a data product. """
     # Because I want to keep this simple and not connect a bucket or require you to download a large dataset, the process data
     # will simply load the *already* processed data, when ideally it should - you know - actually do the processing
     # To keep it in the MLflow framework, I am going to log the output data product
@@ -36,6 +37,7 @@ def process_data(**kwargs):
 
 
 def make_lr(**kwargs):
+    """ Create a linear regression model and log it to mlflow """
     data_run_id = kwargs["ti"].xcom_pull(task_ids="process_data", key="run_id")
     client = MlflowClient()
     path = client.download_artifacts(data_run_id, "processed_data")  # Overkill in our case, but imagine they are on different servers, infrastructures
@@ -61,6 +63,7 @@ def make_lr(**kwargs):
 
 
 def make_rf(**kwargs):
+    """ Create a random forest model and log it to mlflow """
     data_run_id = kwargs["ti"].xcom_pull(task_ids="process_data", key="run_id")
     client = MlflowClient()
     path = client.download_artifacts(data_run_id, "processed_data")  # Overkill in our case, but imagine they are on different servers, infrastructures
@@ -93,21 +96,30 @@ def make_rf(**kwargs):
 
 
 def get_best_model(**kwargs):
+    """ For all the models we logged, determine the best performing run """
     ids = [r for ids in kwargs["ti"].xcom_pull(task_ids=["model_lr", "model_rf"], key="run_id") for r in ids]
     client = MlflowClient()
     runs = [client.get_run(run_id) for run_id in ids]
-
     run_r2 = [run.data.metrics["r2"] for run in runs]
     best_run = runs[np.argmax(run_r2)]
-    logging.warning(best_run)
-
-    # Here we could automatically promote that model into a staging ground, but because we're using the filesystem version of mlflow tracking (unlike
-    # what we did at the start), we can't use that functionality
-
     kwargs["ti"].xcom_push(key="best_model_run_id", value=best_run.info.run_id)
 
 
-mlflow.set_experiment("airflow")
+def register_best_model(**kwargs):
+    """ Take the best performing model, register it under the BestModel name, and ship it to prod """
+    run_id = kwargs["ti"].xcom_pull(task_ids="get_best_model", key="best_model_run_id")
+    model_uri = f"runs:/{run_id}/model"
+    model_details = mlflow.register_model(model_uri, "BestModel")  # note this doesnt put it in prod, but updates the registered model in the model repo
+
+    # This is what would make it prod, but probably shouldnt automate this without some testing and eyes on
+    client = MlflowClient()
+    client.transition_model_version_stage(name=model_details.name, version=model_details.version, stage='Production')
+
+
+mlflow.tracking.set_tracking_uri("http://127.0.0.1:5000")
+mlflow.set_experiment("airflow")  # Notice, diff experiment name to keep things clear
+
+# The airflow code is everything below here. We define the DAG in general, then its tasks, and how the tasks depend on each other
 dag = DAG("DSGo",
           description="Lets turn our little project into a DAG that is set to run every single day at 6am",
           schedule_interval="0 6 * * *",
@@ -119,7 +131,9 @@ task_process = PythonOperator(task_id="process_data", python_callable=process_da
 task_lr = PythonOperator(task_id="model_lr", python_callable=make_lr, dag=dag, provide_context=True)
 task_rf = PythonOperator(task_id="model_rf", python_callable=make_rf, dag=dag, provide_context=True)
 task_get_best_model = PythonOperator(task_id="get_best_model", python_callable=get_best_model, dag=dag, provide_context=True)
+task_register_best_model = PythonOperator(task_id="register_best_model", python_callable=register_best_model, dag=dag, provide_context=True)
 
-task_process >> task_lr
+task_process >> task_lr  # So the linear regression needs to wait on the data processing
 task_process >> task_rf
-[task_lr, task_rf] >> task_get_best_model
+[task_lr, task_rf] >> task_get_best_model  # And the "best model" task waits on everything which makes models
+task_get_best_model >> task_register_best_model  # You get it

@@ -48,7 +48,7 @@ with mlflow.start_run(run_name="keras"): # New, run_name optional
 
     model = get_model()
     model.summary()
-    history = model.fit(X_train, y_train, epochs=200, batch_size=256, validation_split=0.2)
+    history = model.fit(X_train, y_train, epochs=50, batch_size=256, validation_split=0.2)
     
     y_predict = model.predict(X_test)
     rmse, mae, r2 = eval_metrics(y_test, y_predict)
