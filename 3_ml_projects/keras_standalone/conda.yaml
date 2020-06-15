@@ -2,10 +2,12 @@ channels:
 - defaults
 dependencies:
 - python=3.7.7
-- scikit-learn=0.22.1
-- pandas
 - pip
+- numpy
+- matplotlib
+- pandas
+- scikit-learn=0.22.1
 - pip:
   - mlflow
-  - cloudpickle==1.4.1
+  - tensorflow==2.2.0
 name: mlflow-env

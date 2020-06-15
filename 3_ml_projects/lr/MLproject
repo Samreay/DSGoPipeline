@@ -1,5 +1,0 @@
-name: linearRegression
-conda_env: conda.yaml # Or a docker container
-entry_points:
-  main:
-    command: "python model_linreg.py"
