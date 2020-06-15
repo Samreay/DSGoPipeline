@@ -235,6 +235,9 @@ prod. Check out the registered model version
 (the URL is http://localhost:5000/#/models, hard to find in their current UI), 
 you can see that the version in production will increment every time you run the DAG!
 
+If we really wanted, we could generate the report (the jupyter notebook) using the new production model every time the DAG executes,
+which would provide some plots and predictions we could use to try and pick up any issues quickly (though ideally this would happen well before prod...).
+
 
 ## How can I make this useful for a real use-case?
 
