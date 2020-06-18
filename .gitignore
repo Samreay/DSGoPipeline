@@ -1,4 +1,5 @@
 # Byte-compiled / optimized / DLL files
+
 __pycache__/
 *.py[cod]
 *$py.class
@@ -129,3 +130,4 @@ dmypy.json
 .pyre/
 
 mlruns/
+1_starting_point/opsd-weather_data-2019-04-09
