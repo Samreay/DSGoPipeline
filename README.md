@@ -272,4 +272,5 @@ or just include it as another step in our DAG!
 ## Updating the dashboard
 
 To try and complete the circle, you can see in `5_evergreen_dashboard` an updated version to utilise the production model. See the changes in `components/elements.py` on lines 35-43.
-If you open a terminal window here, run `python app.py` and go to `http://127.0.0.1:8050/` you can see it should be giving live predictions using a production model. Hurray!
+If you open a terminal window here, run `python app.py` and go to `http://127.0.0.1:8050/` you can see it should be giving live predictions using a production model. Hurray! If there's time left now, 
+lets go through the dashboard code, because being able to slap together a dashboard like this in about 5 minutes is a super handy skill.
