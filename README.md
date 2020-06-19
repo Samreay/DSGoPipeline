@@ -9,7 +9,6 @@ For windows users, I'd recommend first running `conda install sqlalchemy==1.3.13
 
 `pip install -r requirements.txt`
 
-
 ## The starting point
 
 Within the `starting_point` directory, I've tried to simulate the somewhat chaotic and unstructured way that some data science projects
@@ -45,28 +44,31 @@ the dashboard up to the production model.
 
 First thing we want to do is to start a tracking server. Instead of just pointing this at the file system
 and hoping for the best, lets put in a tiny bit of effort now so that it better emulates a remote tracking
-server like you might actually end up using better. 
+server like you might actually end up using.
 
-So with the tracking, we need a place to put information, and a place to put artifacts. 
-
-The latter is normally a google cloud, Azure blob storage, Amazon S3 bucket, etc. For now, we'll just have a super simple local directory.
-Here is what I would run, swap our your username, change to a ~.
+With the tracking, we need a place to put information, and a place to put artifacts. The latter is normally a google cloud, Azure blob storage, 
+Amazon S3 bucket, etc. For now, we'll just have a super simple local directory. Here is what I would run:
 
 `mlflow server --backend-store-uri sqlite:///mlruns.db --default-artifact-root file:/home/samreay/mlruns`
 
-If you have any issues, you can run the smaller version (which uses the file system for simplicity but doesnt support model registry)
+If you have any issues, you can run the smaller version (which uses the file system for simplicity but doesnt support model registry, so it won't work with the airflow part later)
 
 `mlflow ui`
 
-Now one thing we want to do is make sure that this is the server we use for the entire workshop, so lets set a single environment variable. 
+Optional step: Now one thing we want to do is make sure that this is the server we use for the entire workshop, so lets set a single environment variable. 
 In *yet another* terminal window that I opened in the DSGOPipeline folder, I will now set:
 
 `export MLFLOW_TRACKING_URI=http://127.0.0.1:5000`
 
-which is just the location of the server we launched (though in case anyone misses this step or does it wrong, I also set it in the code). 
-And that's it! Now we jump into the code by starting up jupyter notebooks
+which is just the location of the server we launched. Note that because environment variables are an easy thing to get wrong or for people to do incorrectly,
+I also set it explicitly in all the code, so you don't *need* to do the above. But ideally you wouldn't set anything in the code!
+ 
+And that's it! Now we jump into the code by starting up jupyter notebooks back in the project directory (wherever you clone or downloaded this repo to):
 
 `jupyter notebook`
+
+So you'll have one terminal window (in your home directory) running the mlflow tracking server. And you'll have another terminal window in the project directory
+running jupyter notebooks. Keep both of these terminals up and running for the whole workshop.
 
 Let's first run through the `1_starting_point` folder notebooks, so we can see what's going on. And then we'll want to go through each 
 of those notebooks and convert them to make use of mlflow. You can see the changes in the `2_ml_tracking` folder.
@@ -76,7 +78,7 @@ of those notebooks and convert them to make use of mlflow. You can see the chang
 3. Then with Keras, we make use of autolog, which some libraries have support for (sklearn is not one of them yet, because there are so many different models in sklearn!)
 
 At any point during the above, you can open up the tracking server (in your browser go to http://127.0.0.1:5000) and you can see the metrics, parameters, models and artifacts under the 
-"predicting_solar_wind" experiment.
+"predicting_solar_wind" experiment. If you try and run them all at the same time, the SQLite DB is going to have an issue with you as it only supports sequential writes.
 
 This tracking raises a few questions:
 * How can we compare multiple models ourselves, outside of the UI interface? (Note that this will probably be built into mlflow at some point, and atm tools like Neptune can do it for you, for now as a manual way, see the compare_runs notebook).
@@ -90,15 +92,24 @@ Check out the `compare_runs.ipynb` notebook in the `2_ml_tracking` folder.
 ## How do we promote a given model to production?
 
 If we want hands on review, this is super easy. Simply go to the experiment, find the "best performing" algorithm that you want
-to be staged, and then click on it. Under artifacts, click on model, and you'll see *Register Model*. So I made a new one, called BestModel, which is now registered.
+to be staged, and then click on it. We might decide, for example, that the run with the minimum MAE is the one we want, so we can sort the
+runs on MAE and pick the lowest one, clicking into it. Under artifacts, click on model, and you'll see *Register Model*. So I made a new one, called BestModel, which is now registered.
 
 I can then transition the model into either staging or production, by clicking on it again. Let's move it into production. But now, how can we use it?
 
-For an example using it via the API, see the `get_prod_model.ipynb`.
+Note: access tracked models by going to `localhost:5000/#/models`
 
-We can also serve it locally (or deploy it to SageMaker, AzureML, Spark, etc). Here is the command to do it locally (note the source of the model)
+For an example fetching this model via the API, see the `get_prod_model.ipynb`.
 
-`mlflow models serve -m ftp://user:12345@127.0.0.1:2121/artifacts/1/4fa0fc38c81d4bd8a2c74fe6467cf104/artifacts/model -p 8003`
+We can also serve it locally (or deploy it to SageMaker, AzureML, Spark, etc). Here is the command to do it locally 
+(note the source of the model, which is printed out when you run the notebook above, and you'll have to change this to your location)
+
+`mlflow models serve -m file:///home/samreay/mlruns/1/f0fd5630bb234ba89295d7d34b47254b/artifacts/model -p 8003 --no-conda`
+
+which will expose an endpoint you can use directly to run model predictions without having to run literally any code on your own. If you run the above line (in a new terminal window)
+and then (in yet another new terminal window) run this curl, you should get back predictions:
+
+`curl -d '{"columns": ["windspeed", "temperature", "rad_horizontal", "rad_diffuse"], "data": [[2, 20, 100, 100]]}' -H 'Content-Type: application/json; format=pandas-split' -X POST localhost:8003/invocations`
 
 Once we do have a model that is in production, we can use the code from `get_prod_model.ipynb` and incorportate that into our
 weekly reports and dashboard, solving that issue completely.
@@ -133,9 +144,9 @@ To make the `conda.yaml` step easy,
 don't ask conda for your current environment, just go to your tracked mlflow runs and it'll have a minimal version! But note it only tracks
 what is used in the actual experiment after you call `start_run`, so you might need to add extra stuff in.
 
-We'll wrap up the linear regression example (and not worry about pulling the dataframe as a path argument), so we can run
+We'll wrap up the keras example (and not worry about pulling the dataframe as a path argument), so we can run (in another terminal window in the `3_ml_projects` directory)
 `mlflow run keras_standalone --no-conda --experiment-name predicting_wind_solar`. Note again we specify the experiment name and URI via command line / environment variable,
-rather than defining it in our code. `no-conda` simply because I already havea  working environment, and don't need a new one! If we were inside the directory, we could also run
+rather than defining it in our code. `no-conda` simply because I already have a working environment, and don't need a new one! If we were inside the directory, we could also run
 `mlflow run .`, and of course this can all be done in code:
 
 ```python
@@ -179,8 +190,9 @@ Ive specified below is the default. So Ill open a new terminal window (which I s
 cd ~
 pip install apache-airflow
 mkdir airflow
-export AIRFLOW_HOME=`pwd -P`/airflow
 ```
+
+Note airflow is not part of the `requirements.txt` file, because it may not play nice with windows.
 
 ### Starting Airflow
 
@@ -192,7 +204,7 @@ And then we start the web server as well!
 
 `airflow webserver`
 
-You should now be able to launch `http://localhost:8080` and see a bunch of empty examples. To define a new DAG, it goes
+You should now be able to launch `http://localhost:8888` and see a bunch of empty examples. To define a new DAG, it goes
 inside the `$AIRFLOW_HOME/dags` folder. And a DAG is just a python file defining tasks (aka operators) and how they connect.
 
 You can see a list of possible operators [here](https://airflow.apache.org/docs/stable/_api/airflow/operators/index.html), but they include:
@@ -214,18 +226,29 @@ and then to have airflow pick it up, I'm going to start the scheduler from a new
 
 `airflow scheduler`
 
-And then if we refresh our webserver page, you can see a new DAG has appeared! We can click on it and see each of the tasks.
-We can test tasks piece by piece if want. To test just the `process_data` task, we can go:
+
+If you're keeping track, this is now **four** terminal windows we have open at once:
+
+1. mlflow tracking server (accessible at localhost:5000)
+2. jupyter notebook (accessible at localhost:8888)
+3. airflow webserver (accessible at localhost:8080)
+4. airflow scheduler (in the background)
+
+Back on topic! If we refresh our webserver page, you can see a new DAG has appeared! We can click on it and see each of the tasks in either the tree view or the graph view. And we can turn it on or off if we want it to execute as per the cron schedule configured in the DAG file.
+
+We can test tasks piece by piece if want. To test just the `process_data` task, we can open a new terminal (in our home directory or wherever you want) and run:
 
 `airflow test DSGo process_data 2020-06-14T00:00:00.0`
 
-Or we can kick the whole thing off either by running `airflow trigger_dag DSGo` or just clicking the UI button.
+Back in the browser, if you refresh you can see that the process_data block has now changed outline. I hope its green!
+
+We can kick the whole thing off either by running `airflow trigger_dag DSGo` or just clicking the UI button. It'll take a little while for each task to flow into another, don't worry if this takes a few minutes.
 
 Before doing that, we should probably go through the code in `mlflow_dag.py`
 
 ![Airflow DAG](misc/airflow_dag.png)
 
-Note you can embed ipython or debuggers in here as well if there are issues with a particular task and you are running on a task by task basis.
+Note you can embed ipython or debuggers as well if there are issues with a particular task and you are running on a task by task basis.
  [See this link for details on debuggers](http://michal.karzynski.pl/blog/2017/03/19/developing-workflows-with-apache-airflow/).
 
 
@@ -236,14 +259,15 @@ prod. Check out the registered model version
 you can see that the version in production will increment every time you run the DAG!
 
 If we really wanted, we could generate the report (the jupyter notebook) using the new production model every time the DAG executes,
-which would provide some plots and predictions we could use to try and pick up any issues quickly (though ideally this would happen well before prod...).
+which would provide some plots and predictions we could use to try and pick up any issues quickly (though ideally this would happen well before prod...). We could add this as something external, 
+or just include it as another step in our DAG!
 
 
 ## How can I make this useful for a real use-case?
 
 1. You'd need to set up airflow, a backend data store and an ML tracking server properly.
 2. The little python operators in airflow can become bash operators which just execute MLProjects on arbitrary infrastructure. Because you're only passing back and forth run IDs, theres no worry about data flow.
-3. Better some better checks and balances on your production models.
+3. Better add some checks and validation on your production models.
 
 ## Updating the dashboard
 
